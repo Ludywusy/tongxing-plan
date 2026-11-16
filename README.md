@@ -53,7 +53,7 @@ python -m unittest discover -s tests -p "test_*.py"
 python -m scripts.demo_trip_flow
 ```
 
-**当前状态：以上业务测试与演示尚未实现。** 空目录可能报告 `Ran 0 tests`，不代表测试通过；演示模块在 A 提交前不可运行。联验时必须登记提交 SHA、实际测试数、结果和复核人。
+
 
 ## 数据与演示约定
 
