@@ -1,0 +1,55 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+secrets/
+.secrets/
+
+# Restricted survey material: never commit row-level responses
+research/survey-responses*
+research/raw/
+research/private/
+research/restricted/
+research/exports/
+research/*withdrawal*
+research/*撤回码*
+private/
+restricted/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Frontend and generated caches
+node_modules/
+.next/
+.nuxt/
+.turbo/
+.cache/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Local workspace
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+*.tmp
+tmp/
