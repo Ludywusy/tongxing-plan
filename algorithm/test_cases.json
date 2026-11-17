@@ -1,0 +1,370 @@
+{
+  "fixture_version": "1.0",
+  "base_fixture": "fixtures/demo-trip.json",
+  "detector_entry": "algorithm.conflict_detector.detect",
+  "notes": [
+    "mutations 采用点路径：members.m01.budget_cap；数组元素用 id 索引。",
+    "op 缺省为 set，delete 表示移除该字段。",
+    "expect.reasons 只声明必须存在的原因，断言时先按 (rule_id, member_ids[0]) 排序再逐项比对。",
+    "expect.reasons_count = 0 时必须断言 reasons 为空数组，不是 null。",
+    "所有时间（成员窗、候选全程、节点）一律带 +08:00，不带偏移视为格式非法。"
+  ],
+  "cases": [
+    {
+      "case_id": "TC-001",
+      "title": "基线：m01 承担 81 元，超上限 1 元",
+      "candidate_id": "c01",
+      "mutations": [],
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 1,
+        "reasons": [
+          {
+            "rule_id": "R-BUD-01",
+            "member_ids": ["m01"],
+            "field": "cost_per_member.m01",
+            "actual": 8100,
+            "threshold": 8000
+          }
+        ],
+        "missing_fields": []
+      }
+    },
+    {
+      "case_id": "TC-002",
+      "title": "基线：c02 广场与展览可行",
+      "candidate_id": "c02",
+      "mutations": [],
+      "expect": {
+        "status": "feasible",
+        "reasons_count": 0,
+        "missing_fields": []
+      }
+    },
+    {
+      "case_id": "TC-003",
+      "title": "基线：c03 室内手作可行",
+      "candidate_id": "c03",
+      "mutations": [],
+      "expect": {
+        "status": "feasible",
+        "reasons_count": 0,
+        "missing_fields": []
+      }
+    },
+    {
+      "case_id": "TC-004",
+      "title": "边界：候选结束时间等于共同窗右端，算完整落入",
+      "candidate_id": "c02",
+      "mutations": [],
+      "expect": {
+        "status": "feasible",
+        "reasons_count": 0,
+        "forbid_rule_ids": ["R-TIME-01", "R-TIME-02"],
+        "missing_fields": []
+      }
+    },
+    {
+      "case_id": "TC-005",
+      "title": "边界：共同窗右端提前 1 分钟，候选超出即不可行",
+      "candidate_id": "c02",
+      "mutations": [
+        {
+          "path": "members.m03.available_windows",
+          "value": [
+            { "start": "2026-11-21T13:00:00+08:00", "end": "2026-11-21T16:59:00+08:00" }
+          ]
+        }
+      ],
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 1,
+        "reasons": [
+          {
+            "rule_id": "R-TIME-01",
+            "member_ids": ["m03"],
+            "actual": "2026-11-21T17:00:00+08:00",
+            "threshold": "2026-11-21T16:59:00+08:00"
+          }
+        ],
+        "missing_fields": []
+      }
+    },
+    {
+      "case_id": "TC-006",
+      "title": "共同可用窗为空集",
+      "candidate_id": "c02",
+      "mutations": [
+        {
+          "path": "members.m04.available_windows",
+          "value": [
+            { "start": "2026-11-21T18:00:00+08:00", "end": "2026-11-21T19:00:00+08:00" }
+          ]
+        }
+      ],
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 1,
+        "reasons": [
+          { "rule_id": "R-TIME-02", "member_ids": ["m04"] }
+        ],
+        "missing_fields": []
+      },
+      "note": "归因规则：谁的任何一段（合并后）空闲都装不下候选，就报谁。m04 全程缺席，其余三人的窗都装得下候选。"
+    },
+    {
+      "case_id": "TC-007",
+      "title": "同一成员的相邻窗合并：13:30–15:00 与 15:00–18:00 视为连续可用",
+      "candidate_id": "c02",
+      "mutations": [
+        {
+          "path": "members.m02.available_windows",
+          "value": [
+            { "start": "2026-11-21T13:30:00+08:00", "end": "2026-11-21T15:00:00+08:00" },
+            { "start": "2026-11-21T15:00:00+08:00", "end": "2026-11-21T18:00:00+08:00" }
+          ]
+        }
+      ],
+      "expect": {
+        "status": "feasible",
+        "reasons_count": 0,
+        "forbid_rule_ids": ["R-TIME-01", "R-TIME-02"],
+        "missing_fields": []
+      },
+      "note": "任务书第 2 条：成员内部按并集合并重叠或相邻区间。若实现改成『相接不合并』，本用例会误判为 infeasible。"
+    },
+    {
+      "case_id": "TC-008",
+      "title": "边界：承担额等于上限，算通过",
+      "candidate_id": "c01",
+      "mutations": [{ "path": "members.m01.budget_cap", "value": 8100 }],
+      "expect": {
+        "status": "feasible",
+        "reasons_count": 0,
+        "forbid_rule_ids": ["R-BUD-01"],
+        "missing_fields": []
+      }
+    },
+    {
+      "case_id": "TC-009",
+      "title": "多原因全部收集，不早停",
+      "candidate_id": "c01",
+      "mutations": [
+        { "path": "members.m02.allowed_transport", "value": ["bus"] }
+      ],
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 2,
+        "reasons": [
+          {
+            "rule_id": "R-BUD-01",
+            "member_ids": ["m01"],
+            "actual": 8100,
+            "threshold": 8000
+          },
+          {
+            "rule_id": "R-TRANS-01",
+            "member_ids": ["m02"],
+            "field": "c01-n01"
+          }
+        ],
+        "missing_fields": []
+      },
+      "note": "排序后顺序必须是 R-BUD-01 在 R-TRANS-01 之前；若实现按发现顺序输出，此例失败。"
+    },
+    {
+      "case_id": "TC-010",
+      "title": "交通方式被拒，逐段查、只报一条、指向第一段",
+      "candidate_id": "c02",
+      "mutations": [
+        { "path": "members.m03.allowed_transport", "value": ["walk"] }
+      ],
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 1,
+        "reasons": [
+          { "rule_id": "R-TRANS-01", "member_ids": ["m03"], "field": "c02-n01" }
+        ],
+        "missing_fields": []
+      }
+    },
+    {
+      "case_id": "TC-011",
+      "title": "地点标签命中禁忌，其他候选不受影响",
+      "candidate_id": "c02",
+      "mutations": [{ "path": "members.m04.taboo_tags", "value": ["gallery"] }],
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 1,
+        "reasons": [
+          { "rule_id": "R-TABOO-01", "member_ids": ["m04"], "field": "c02-n03" }
+        ],
+        "missing_fields": []
+      },
+      "companion_assertions": [
+        { "candidate_id": "c01", "status": "infeasible", "reasons_count": 1 },
+        { "candidate_id": "c03", "status": "feasible", "reasons_count": 0 }
+      ]
+    },
+    {
+      "case_id": "TC-012",
+      "title": "缺字段压过不可行：c01 应由 infeasible 变为 incomplete",
+      "candidate_id": "c01",
+      "mutations": [{ "path": "members.m02.budget_cap", "op": "delete" }],
+      "expect": {
+        "status": "incomplete",
+        "reasons_count": 0,
+        "missing_fields": [{ "member_id": "m02", "field": "budget_cap", "rule_id": "R-DATA-01" }]
+      },
+      "note": "优先级用例。若实现先跑预算，会输出 R-BUD-01 并判 infeasible，虽然看着合理，但会把用户引去换方案而不是补表单。"
+    },
+    {
+      "case_id": "TC-013",
+      "title": "口径未定：预算未声明含不含往返",
+      "candidate_id": "c01",
+      "mutations": [{ "path": "members.m01.budget_basis", "op": "delete" }],
+      "expect": {
+        "status": "incomplete",
+        "reasons_count": 0,
+        "missing_fields": [{ "member_id": "m01", "field": "budget_basis", "rule_id": "R-DATA-02" }]
+      },
+      "note": "去掉了 budget_basis 就无法判断 8000 分是不是含往返，结论不可比，只能先补口径。"
+    },
+    {
+      "case_id": "TC-014",
+      "title": "软偏好不参与判定：改兴趣，三卡状态逐字不变",
+      "candidate_id": "c02",
+      "mutations": [
+        { "path": "members.m01.interest_tags", "value": ["craft", "outdoor"] }
+      ],
+      "expect": {
+        "status": "feasible",
+        "reasons_count": 0,
+        "missing_fields": []
+      },
+      "companion_assertions": [
+        { "candidate_id": "c01", "status": "infeasible", "reasons_count": 1 },
+        { "candidate_id": "c03", "status": "feasible", "reasons_count": 0 }
+      ],
+      "note": "兴趣一旦进入过滤，三卡会全灭，产品退化成推荐器。这条守的是产品边界，不是代码 bug。"
+    },
+    {
+      "case_id": "TC-015",
+      "title": "同一输入连跑两次，输出逐字一致",
+      "candidate_id": "c02",
+      "mutations": [],
+      "repeat": 2,
+      "expect": {
+        "status": "feasible",
+        "identical_serialization": true,
+        "identical_fingerprint": true
+      }
+    },
+    {
+      "case_id": "TC-016",
+      "title": "变更后 v2 超出共同窗，G3 不得生成预览",
+      "candidate_id": "c02",
+      "mode": "resolved_trip",
+      "trip": {
+        "version": "v2",
+        "based_on": "v1",
+        "overrides": [
+          {
+            "replaces": "c02-n04",
+            "node": {
+              "node_id": "c02-n04-r1",
+              "start": "2026-11-21T16:30:00+08:00",
+              "end": "2026-11-21T17:20:00+08:00",
+              "kind": "transit",
+              "transport": "metro"
+            },
+            "reason": "替代方案返程延后"
+          }
+        ]
+      },
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 1,
+        "reasons": [
+          { "rule_id": "R-TIME-01", "member_ids": ["m03"] }
+        ],
+        "missing_fields": [],
+        "preview_allowed": false
+      },
+      "companion_assertions": [
+        {
+          "candidate_id": "c02",
+          "field": "nodes.c02-n04.end",
+          "unchanged_value": "2026-11-21T17:00:00+08:00"
+        }
+      ]
+    },
+    {
+      "case_id": "TC-017",
+      "title": "同一成员留了 5 分钟空档（14:55–15:00）就不合并，候选装不进",
+      "candidate_id": "c02",
+      "mutations": [
+        {
+          "path": "members.m02.available_windows",
+          "value": [
+            { "start": "2026-11-21T13:30:00+08:00", "end": "2026-11-21T14:55:00+08:00" },
+            { "start": "2026-11-21T15:00:00+08:00", "end": "2026-11-21T18:00:00+08:00" }
+          ]
+        }
+      ],
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 1,
+        "reasons": [
+          { "rule_id": "R-TIME-01", "member_ids": ["m02"] }
+        ],
+        "missing_fields": []
+      },
+      "note": "要留返校或赶路时间，就把那段空档写进可用窗；写了空档就不能要求候选跨过它。与 TC-007 成对：端点重合合并、有真空档不合并。"
+    },
+    {
+      "case_id": "TC-018",
+      "title": "不同成员只在端点相碰（15:00）不产生共同可用时长",
+      "candidate_id": "c02",
+      "mutations": [
+        {
+          "path": "members.m01.available_windows",
+          "value": [
+            { "start": "2026-11-21T13:00:00+08:00", "end": "2026-11-21T15:00:00+08:00" }
+          ]
+        },
+        {
+          "path": "members.m02.available_windows",
+          "value": [
+            { "start": "2026-11-21T15:00:00+08:00", "end": "2026-11-21T18:00:00+08:00" }
+          ]
+        }
+      ],
+      "expect": {
+        "status": "infeasible",
+        "reasons_count": 1,
+        "reasons": [
+          { "rule_id": "R-TIME-02", "member_ids": ["m01", "m02"] }
+        ],
+        "missing_fields": []
+      },
+      "note": "任务书第 2 条：仅端点相碰没有正时长。若交集实现漏掉『必需正时长』，会算出一段 15:00–15:00 的假共同窗。"
+    },
+    {
+      "case_id": "TC-019",
+      "title": "节点时间写成 HH:MM（不带偏移）判格式非法，不猜时区",
+      "candidate_id": "c02",
+      "mutations": [
+        { "path": "candidates.c02.nodes.c02-n02.start", "value": "14:00" }
+      ],
+      "expect": {
+        "status": "incomplete",
+        "reasons_count": 0,
+        "missing_fields": [
+          { "member_id": null, "field": "nodes.c02-n02", "rule_id": "R-DATA-01" }
+        ]
+      },
+      "note": "同一条规则覆盖『HH:MM』与『缺 nodes』两种：格式非法或缺字段都先判 incomplete，再谈可行不可行。"
+    }
+  ]
+}
