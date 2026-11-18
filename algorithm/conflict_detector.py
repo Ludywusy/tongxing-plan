@@ -96,6 +96,13 @@ def check_completeness(fixture, trip):
         if not isinstance(transport, list) or not transport:
             missing.append({"member_id": mid, "field": "allowed_transport", "rule_id": "R-DATA-01"})
 
+        # [] 表示明确没有禁忌，未填写则仍需成员确认。
+        taboo_tags = m.get("taboo_tags")
+        if not isinstance(taboo_tags, list) or any(
+            not isinstance(tag, str) or not tag.strip() for tag in taboo_tags
+        ):
+            missing.append({"member_id": mid, "field": "taboo_tags", "rule_id": "R-DATA-01"})
+
         # 口径未定：预算必须声明含不含往返、按人还是按组
         basis = m.get("budget_basis")
         if not isinstance(basis, dict) \
@@ -107,10 +114,13 @@ def check_completeness(fixture, trip):
                             "field": "budget_basis.share_rule", "rule_id": "R-DATA-02"})
 
     win = trip.get("window")
+    bounds = None
     try:
-        if not parse_time(win["start"]) < parse_time(win["end"]):
+        start, end = parse_time(win["start"]), parse_time(win["end"])
+        if start >= end:
             raise ValueError
-    except Exception:
+        bounds = (start, end)
+    except (KeyError, TypeError, ValueError):
         missing.append({"member_id": None, "field": "window", "rule_id": "R-DATA-01"})
 
     costs = trip.get("cost_per_member")
@@ -121,20 +131,33 @@ def check_completeness(fixture, trip):
                             "rule_id": "R-DATA-01"})
 
     nodes = trip.get("nodes")
-    if not isinstance(nodes, list) or not nodes:
+    if not isinstance(nodes, list) or not nodes or any(not isinstance(node, dict) for node in nodes):
         missing.append({"member_id": None, "field": "nodes", "rule_id": "R-DATA-01"})
     else:
+        window_mismatch = False
+        seen_ids = set()
         for node in sorted(nodes, key=lambda n: str(n.get("node_id"))):
-            nid = node.get("node_id", "?")
+            nid = node.get("node_id")
+            if not isinstance(nid, str) or not nid.strip() or nid in seen_ids:
+                missing.append({"member_id": None, "field": "nodes.node_id", "rule_id": "R-DATA-01"})
+                continue
+            seen_ids.add(nid)
             if not node.get("kind"):
                 missing.append({"member_id": None, "field": "nodes." + nid, "rule_id": "R-DATA-01"})
                 continue
             try:
-                if not parse_time(node["start"]) < parse_time(node["end"]):
+                start, end = parse_time(node["start"]), parse_time(node["end"])
+                if start >= end:
                     raise ValueError
-            except Exception:
+            except (KeyError, TypeError, ValueError):
                 missing.append({"member_id": None, "field": "nodes." + nid,
                                 "rule_id": "R-DATA-01"})
+            else:
+                # 防止候选填了较短的时间窗，却在节点中安排更晚的返校时间。
+                if bounds is not None and (start < bounds[0] or end > bounds[1]):
+                    window_mismatch = True
+        if window_mismatch:
+            missing.append({"member_id": None, "field": "window", "rule_id": "R-DATA-01"})
 
     missing.sort(key=lambda x: (str(x["member_id"]), x["field"]))
     return missing
@@ -198,8 +221,11 @@ def _time_violators(fixture, window):
 
 def expand_nodes(nodes, overrides):
     """行程层覆盖记录 -> 展开后的节点序列；原节点不被修改。"""
+    if not isinstance(nodes, list):
+        return nodes  # 留给完整性检查返回结构化缺项。
     replaces = {o["replaces"]: o["node"] for o in overrides or []}
-    return [replaces.get(n["node_id"], n) for n in nodes]
+    return [replaces.get(n["node_id"], n) if isinstance(n, dict)
+            and isinstance(n.get("node_id"), str) else n for n in nodes]
 
 
 def window_from_nodes(nodes):
@@ -213,10 +239,13 @@ def window_from_nodes(nodes):
 def trip_from_candidate(candidate, overrides=None):
     """固定候选（可带 overrides）-> 交给检测器的整条行程。"""
     nodes = expand_nodes(candidate.get("nodes"), overrides)
-    if overrides:
-        window = window_from_nodes(nodes) if nodes else None
-    else:
-        window = candidate.get("window")
+    window = candidate.get("window")
+    if overrides and isinstance(nodes, list) and nodes:
+        try:
+            window = window_from_nodes(nodes)
+        except (KeyError, TypeError, ValueError):
+            # 出错的节点继续进入完整性检查；检测器会指出缺项而不是抛出异常。
+            pass
     return {
         "candidate_id": candidate.get("candidate_id"),
         "window": window,

@@ -2,9 +2,11 @@
 
 | 入口 | 地址或位置 |
 | --- | --- |
-| 在线演示 | 暂无地址 |
-| 本地演示脚本 | 约定入口为 `scripts/demo_trip_flow.py`；文件提供后使用下方命令 |
-| 离线截图或演示包 | 暂无文件 |
+| Python 终端演示 | `scripts/demo_trip_flow.py`，执行下方命令 |
+| 固定合成输入 | [共享样例](../fixtures/demo-trip.json)，Android 随应用打包 |
+| Android 调试 APK | 待 C 提供；默认构建路径 `mobile/build/app/outputs/flutter-apk/app-debug.apk` |
+| Android 构建、安装及飞行模式走查 | [第一周演示与联验](week1-demo.md) |
+| 四机联机 | [第二周交接](week2-handoff.md)，待服务和真机联调 |
 
 在仓库根目录运行本地演示：
 
@@ -12,4 +14,4 @@
 python -m scripts.demo_trip_flow
 ```
 
-在线地址与离线文件接入后，在此填写可访问链接、起始页面、演示数据版本及离线打开方式。演示中的模拟数据应有明确标记。
+Android 演示从群组与偏好页开始，使用同一台手机上的四个本地身份。安装和走查完成后，在验收表登记 APK 位置、真机型号、样例版本与离线结果。
