@@ -1,5 +1,8 @@
+import json
 import unittest
+from copy import deepcopy
 from datetime import datetime, timezone
+from pathlib import Path
 
 from core.trip_state import TripPhase, TripState
 
@@ -153,3 +156,137 @@ class TripConfirmationTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     trip.select_candidate(actor, candidate)
                 self.assertIs(trip.phase, TripPhase.CANDIDATES)
+
+
+class SharedTripChangeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        fixture_path = Path(__file__).resolve().parents[1] / "fixtures" / "demo-trip.json"
+        self.fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+        self.rain = self.fixture["rain_event"]
+        self.replacement = self.fixture["rain_replacement"]
+        self.member_ids = tuple(member["member_id"] for member in self.fixture["members"])
+
+    def publish(self, *, omit_budget_basis: bool = False) -> TripState:
+        trip = TripState(self.member_ids)
+        for member in self.fixture["members"]:
+            submission = dict(member)
+            if omit_budget_basis and member["member_id"] == "m01":
+                submission.pop("budget_basis")
+            trip.submit_member(member["member_id"], submission)
+        trip.open_fixture_candidates(self.fixture)
+        return trip
+
+    def start(self) -> TripState:
+        trip = self.publish()
+        trip.select_candidate("m01", "c02")
+        for member_id in self.member_ids:
+            trip.confirm_candidate(member_id, "c02", "v1")
+        trip.start_trip("m01", "c02", "v1")
+        return trip
+
+    def test_real_detector_gates_using_submitted_data(self) -> None:
+        trip = self.publish()
+        c01, c02, c03 = trip.candidate_results
+        self.assertEqual((c01["status"], c02["status"], c03["status"]),
+                         ("infeasible", "feasible", "feasible"))
+        conflict = c01["reasons"][0]
+        self.assertEqual((conflict["rule_id"], conflict["actual"], conflict["threshold"]),
+                         ("R-BUD-01", 8100, 8000))
+        with self.assertRaisesRegex(RuntimeError, "infeasible"):
+            trip.select_candidate("m01", "c01")
+
+        incomplete = self.publish(omit_budget_basis=True)
+        self.assertIn({"member_id": "m01", "field": "budget_basis", "rule_id": "R-DATA-02"},
+                      incomplete.candidate_results[1]["missing_fields"])
+        with self.assertRaisesRegex(RuntimeError, "incomplete"):
+            incomplete.select_candidate("m01", "c02")
+        self.assertIs(incomplete.phase, TripPhase.CANDIDATES)
+
+    def test_shared_detector_cannot_publish_for_a_partial_roster(self) -> None:
+        trip = TripState(self.member_ids[:3])
+        for member in self.fixture["members"][:3]:
+            trip.submit_member(member["member_id"], member)
+        with self.assertRaisesRegex(RuntimeError, "requires exactly"):
+            trip.open_fixture_candidates(self.fixture)
+        self.assertIs(trip.phase, TripPhase.COLLECTING)
+        self.assertEqual(trip.candidate_results, ())
+
+    def test_rain_marks_only_outdoor_activity_with_positive_overlap(self) -> None:
+        trip = self.start()
+        original = trip.current_itinerary
+        earlier = deepcopy(self.rain)
+        earlier["window"] = {"start": "2026-11-21T13:30:00+08:00",
+                             "end": "2026-11-21T14:00:00+08:00"}
+        # 雨窗覆盖交通，并恰好在户外节点开始时结束，不能算直接命中。
+        no_hit = trip.preview_change("m01", "v1", earlier, self.replacement)
+        self.assertIsNone(no_hit.preview_id)
+        self.assertEqual(no_hit.impact.affected_node_ids, ())
+        preview = trip.preview_change("m01", "v1", self.rain, self.replacement)
+        self.assertIs(trip.phase, TripPhase.CHANGE_PENDING)
+        self.assertEqual(preview.impact.affected_node_ids, ("c02-n02",))
+        self.assertEqual(preview.impact.unchanged_node_ids, ("c02-n01", "c02-n03", "c02-n04"))
+        self.assertEqual(preview.impact.rule_result["status"], "feasible")
+        self.assertEqual(trip.current_itinerary, original)
+
+    def test_cancel_keeps_original_and_invalidates_preview_id(self) -> None:
+        trip = self.start()
+        original = trip.current_itinerary
+        canceled = trip.preview_change("m01", "v1", self.rain, self.replacement)
+        trip.cancel_change("m01", canceled.preview_id, "v1")
+        self.assertIs(trip.phase, TripPhase.EXECUTING)
+        self.assertEqual(trip.current_itinerary, original)
+        self.assertEqual(trip.confirmed_member_ids, self.member_ids)
+        self.assertEqual(trip.events[-1].event, "cancel_change")
+        self.assertEqual(trip.events[-1].base_version, "v1")
+
+        fresh = trip.preview_change("m01", "v1", self.rain, self.replacement)
+        with self.assertRaisesRegex(RuntimeError, "no longer active"):
+            trip.apply_change("m01", canceled.preview_id, "v1")
+        self.assertEqual(trip.pending_change.preview_id, fresh.preview_id)
+        self.assertEqual(trip.locked_plan.version, "v1")
+
+    def test_missing_or_over_budget_replacement_does_not_change_itinerary(self) -> None:
+        trip = self.start()
+        original = trip.current_itinerary
+        missing = trip.preview_change("m01", "v1", self.rain)
+        self.assertIsNone(missing.preview_id)
+        self.assertEqual(missing.impact.affected_node_ids, ("c02-n02",))
+        self.assertIn("人工调整", missing.impact.reason)
+
+        costly = deepcopy(self.replacement)
+        costly["cost_per_member"]["m01"] = 8100
+        blocked = trip.preview_change("m01", "v1", self.rain, costly)
+        self.assertIsNone(blocked.preview_id)
+        self.assertEqual(blocked.impact.rule_result["status"], "infeasible")
+        self.assertEqual(blocked.impact.rule_result["reasons"][0]["rule_id"], "R-BUD-01")
+        self.assertIsNone(trip.pending_change)
+        self.assertEqual(trip.locked_plan.version, "v1")
+        self.assertEqual(trip.current_itinerary, original)
+
+    def test_apply_only_changes_target_and_records_new_version(self) -> None:
+        trip = self.start()
+        before = trip.current_itinerary["nodes"]
+        preview = trip.preview_change("m01", "v1", self.rain, self.replacement)
+        with self.assertRaisesRegex(RuntimeError, "organizer"):
+            trip.apply_change("m02", preview.preview_id, "v1")
+
+        # 页面持有的是预览副本，后续编辑不能绕过已通过的复检。
+        preview.impact.itinerary["nodes"][1]["node_id"] = "unexpected"
+        plan = trip.apply_change("m01", preview.preview_id, "v1")
+        after = trip.current_itinerary["nodes"]
+        self.assertEqual((plan.candidate_id, plan.version), ("c02", "v2"))
+        self.assertEqual(after[:1] + after[2:], before[:1] + before[2:])
+        self.assertEqual(after[1]["node_id"], "c02-n02-r1")
+        self.assertEqual(trip.confirmed_member_ids, ())
+        applied = trip.events[-1]
+        self.assertEqual((applied.event, applied.actor_id, applied.base_version, applied.plan_version),
+                         ("apply_change", "m01", "v1", "v2"))
+        self.assertEqual([entry.actor_id for entry in trip.events if entry.event == "confirm_candidate"],
+                         list(self.member_ids))
+
+        with self.assertRaisesRegex(RuntimeError, "stale"):
+            trip.apply_change("m01", preview.preview_id, "v1")
+        with self.assertRaisesRegex(RuntimeError, "stale"):
+            trip.confirm_candidate("m01", "c02", "v1")
+        self.assertEqual(trip.locked_plan.version, "v2")
+        self.assertIs(trip.phase, TripPhase.EXECUTING)

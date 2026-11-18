@@ -1,5 +1,5 @@
 {
-  "fixture_version": "1.0",
+  "fixture_version": "1.1",
   "timezone": "Asia/Shanghai",
   "trip_date": "2026-11-21",
   "origin": {
@@ -152,6 +152,36 @@
       }
     }
   ],
+  "rain_event": {
+    "event_id": "rain-01",
+    "type": "rain",
+    "window": {
+      "start": "2026-11-21T14:00:00+08:00",
+      "end": "2026-11-21T15:00:00+08:00"
+    },
+    "source": {
+      "type": "simulated",
+      "note": "固定演示数据",
+      "retrieved_at": "2026-11-21T13:45:00+08:00"
+    }
+  },
+  "rain_replacement": {
+    "replaces": "c02-n02",
+    "node": {
+      "node_id": "c02-n02-r1",
+      "start": "2026-11-21T14:00:00+08:00",
+      "end": "2026-11-21T15:00:00+08:00",
+      "kind": "activity",
+      "place_tag": "gallery_indoor",
+      "indoor": true
+    },
+    "cost_per_member": {
+      "m01": 6400,
+      "m02": 6400,
+      "m03": 6400,
+      "m04": 6400
+    }
+  },
   "candidates": [
     {
       "candidate_id": "c01",

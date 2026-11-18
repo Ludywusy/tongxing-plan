@@ -141,7 +141,7 @@ class DetectorCaseTests(unittest.TestCase):
         self.assertEqual([], feasible["reasons"])
         self.assertEqual([], feasible["missing_fields"])
         self.assertEqual("c02", feasible["candidate_id"])
-        self.assertEqual("1.0", feasible["fixture_version"])
+        self.assertEqual(self.base["fixture_version"], feasible["fixture_version"])
         self.assertTrue(re.fullmatch(r"[0-9a-f]{8}", feasible["input_fingerprint"]))
 
         infeasible = detect(fixture, "c01")
@@ -178,6 +178,47 @@ class DetectorCaseTests(unittest.TestCase):
             self.assertEqual(by_id["status"], other["status"])
             self.assertEqual(json.dumps(by_id["reasons"], sort_keys=True),
                              json.dumps(other["reasons"], sort_keys=True))
+
+    def test_missing_or_malformed_nodes_return_incomplete(self):
+        for bad_nodes in (None, {"node_id": "c02-n01"}, [None]):
+            with self.subTest(nodes=bad_nodes):
+                fixture = copy.deepcopy(self.base)
+                candidate = _resolve(fixture["candidates"], "c02")
+                if bad_nodes is None:
+                    del candidate["nodes"]
+                else:
+                    candidate["nodes"] = bad_nodes
+                result = detect(fixture, "c02")
+                self.assertEqual("incomplete", result["status"])
+                self.assertEqual([], result["reasons"])
+                self.assertEqual([{"member_id": None, "field": "nodes", "rule_id": "R-DATA-01"}],
+                                 result["missing_fields"])
+
+    def test_missing_taboo_tags_is_not_treated_as_no_taboo(self):
+        fixture = copy.deepcopy(self.base)
+        del _resolve(fixture["members"], "m02")["taboo_tags"]
+        result = detect(fixture, "c02")
+        self.assertEqual("incomplete", result["status"])
+        self.assertEqual([{"member_id": "m02", "field": "taboo_tags", "rule_id": "R-DATA-01"}],
+                         result["missing_fields"])
+
+    def test_candidate_window_must_cover_return_node(self):
+        fixture = copy.deepcopy(self.base)
+        candidate = _resolve(fixture["candidates"], "c02")
+        _resolve(candidate["nodes"], "c02-n04")["end"] = "2026-11-21T17:30:00+08:00"
+        result = detect(fixture, "c02")
+        self.assertEqual("incomplete", result["status"])
+        self.assertEqual([{"member_id": None, "field": "window", "rule_id": "R-DATA-01"}],
+                         result["missing_fields"])
+
+    def test_duplicate_node_ids_do_not_allow_ambiguous_replacement(self):
+        fixture = copy.deepcopy(self.base)
+        nodes = _resolve(fixture["candidates"], "c02")["nodes"]
+        nodes[2]["node_id"] = nodes[1]["node_id"]
+        result = detect(fixture, "c02")
+        self.assertEqual("incomplete", result["status"])
+        self.assertEqual([{"member_id": None, "field": "nodes.node_id", "rule_id": "R-DATA-01"}],
+                         result["missing_fields"])
 
     def test_case_ids_unique(self):
         ids = [c["case_id"] for c in self.suite["cases"]]

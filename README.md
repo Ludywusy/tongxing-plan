@@ -6,6 +6,8 @@
 
 - [GitHub 仓库](https://github.com/Ludywusy/tongxing-plan)
 - [演示与离线资料](docs/prototype.md)
+- [共享样例与状态约定](docs/decisions.md)
+- [Flutter 与 FastAPI 接口契约（待复核）](docs/api-contract.md)
 - [数据说明](research/README.md)
 
 ## 获取项目
@@ -42,9 +44,11 @@ python -m unittest discover -s tests -p "test_*.py"
 
 命令发现各目录中的 `test_*.py` 文件；实际测试数量取决于检出版本中的测试文件。
 
-## 演示与离线资料
+## 演示与验收
 
-[演示入口说明](docs/prototype.md) 集中登记在线地址、运行命令和离线文件位置。未提供的入口明确标注，不使用无效链接。
+在仓库根目录运行 `python -m scripts.demo_trip_flow`，用[共享样例](fixtures/demo-trip.json)查看候选硬冲突、四人确认及模拟降雨后的行程更新。
+
+第一周另外验收一台 Android 真机断网切换四个本地身份。调试 APK 及安装说明见[演示与离线资料](docs/prototype.md)，真机结果由 C 登记。第二周[联机验收](docs/week2-handoff.md)用四台 Android 手机在同一个房间提交偏好并查看进度和汇总。
 
 ## 数据说明
 

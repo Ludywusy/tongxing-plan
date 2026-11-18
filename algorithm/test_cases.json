@@ -1,5 +1,5 @@
 {
-  "fixture_version": "1.0",
+  "fixture_version": "1.1",
   "base_fixture": "fixtures/demo-trip.json",
   "detector_entry": "algorithm.conflict_detector.detect",
   "notes": [

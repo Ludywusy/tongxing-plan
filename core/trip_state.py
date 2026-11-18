@@ -1,4 +1,4 @@
-"""管理意向收集、方案候选、成员确认和行程执行。"""
+"""管理成员提交、候选确认、行程执行及版本化变更。"""
 
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
@@ -7,12 +7,16 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import NoReturn
 
+from algorithm.conflict_detector import REQUIRED_MEMBER_IDS, detect, trip_from_candidate
+from core.change_impact import ChangeImpact, analyze_rain
+
 
 class TripPhase(Enum):
     COLLECTING = "collecting"
     CANDIDATES = "candidates"
     CONFIRMING = "confirming"
     EXECUTING = "executing"
+    CHANGE_PENDING = "change_pending"
 
 
 @dataclass(frozen=True)
@@ -33,6 +37,17 @@ class TripEvent:
     plan_version: str | None
     candidate_id: str | None
     reason: str | None = None
+    base_version: str | None = None
+    preview_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ChangePreview:
+    """仅有预览编号的结果可以应用；失败原因仍供页面显示。"""
+
+    preview_id: str | None
+    base_version: str
+    impact: ChangeImpact
 
 
 class TripState:
@@ -67,6 +82,11 @@ class TripState:
         self._version_number = 0
         self._confirmed_members: set[str] = set()
         self._events: list[TripEvent] = []
+        self._detection_fixture: dict | None = None
+        self._itineraries: dict[str, dict] = {}
+        self._current_itinerary: dict | None = None
+        self._pending_change: ChangePreview | None = None
+        self._preview_number = 0
 
     @property
     def phase(self) -> TripPhase:
@@ -98,6 +118,15 @@ class TripState:
     @property
     def locked_plan(self) -> PlanRef | None:
         return self._locked_plan
+
+    @property
+    def current_itinerary(self) -> dict | None:
+        """执行中已生效的行程。预览期间仍返回原行程。"""
+        return deepcopy(self._current_itinerary)
+
+    @property
+    def pending_change(self) -> ChangePreview | None:
+        return deepcopy(self._pending_change)
 
     @property
     def confirmed_member_ids(self) -> tuple[str, ...]:
@@ -137,13 +166,7 @@ class TripState:
         """全员提交后，由发起人发布 B 提供的候选检测结果。"""
         event = "open_candidates"
         actor_id = self._organizer_id if actor_id is None else actor_id
-        self._require_organizer(event, actor_id)
-        if self.phase is not TripPhase.COLLECTING:
-            self._reject(event, actor_id, "Candidate selection can only open from collection.")
-
-        pending = self.pending_member_ids
-        if pending:
-            self._reject(event, actor_id, f"Missing member submissions: {', '.join(pending)}")
+        self._require_candidate_publication(actor_id)
 
         candidates: dict[str, dict[str, object]] = {}
         for result in results:
@@ -160,6 +183,39 @@ class TripState:
 
         self._record(event, actor_id, to_phase=TripPhase.CANDIDATES)
         self._candidate_results = candidates
+
+    def open_fixture_candidates(self, fixture: dict, *, actor_id: str | None = None) -> None:
+        """用最新成员提交和共享候选运行 B，同时留存整程快照供降雨复检。"""
+        event = "open_candidates"
+        actor_id = self._organizer_id if actor_id is None else actor_id
+        self._require_candidate_publication(actor_id)
+        if set(self._member_ids) != set(REQUIRED_MEMBER_IDS):
+            self._reject(event, actor_id, "The shared fixture detector requires exactly m01–m04.")
+        if not fixture.get("fixture_version"):
+            self._reject(event, actor_id, "The shared fixture needs a fixture_version.")
+        candidates = fixture.get("candidates")
+        if not isinstance(candidates, list) or not candidates:
+            self._reject(event, actor_id, "The shared fixture needs a non-empty candidate list.")
+        if any(not isinstance(c, dict) or not isinstance(c.get("candidate_id"), str)
+               or not c["candidate_id"].strip() for c in candidates):
+            self._reject(event, actor_id, "Each shared candidate needs a non-empty candidate_id.")
+
+        snapshot = deepcopy(fixture)
+        submissions = self.member_submissions
+        snapshot["members"] = [
+            dict(submissions[member_id], member_id=member_id)
+            for member_id in self._member_ids
+        ]
+        candidates = snapshot["candidates"]
+        itineraries = {
+            candidate["candidate_id"]: trip_from_candidate(candidate) for candidate in candidates
+        }
+        self.open_candidates(
+            [detect(snapshot, candidate["candidate_id"]) for candidate in candidates],
+            actor_id=actor_id,
+        )
+        self._detection_fixture = snapshot
+        self._itineraries = itineraries
 
     def select_candidate(self, actor_id: str, candidate_id: str) -> PlanRef:
         """选中可行候选并创建确认版本。改选时清空旧确认。"""
@@ -211,7 +267,7 @@ class TripState:
         event = "start_trip"
         self._require_organizer(event, actor_id)
         plan = self._require_current_plan(event, actor_id, candidate_id, version)
-        if self.phase is TripPhase.EXECUTING:
+        if self.phase in (TripPhase.EXECUTING, TripPhase.CHANGE_PENDING):
             self._reject(event, actor_id, "The trip is already executing.")
         if self.locked_plan != plan:
             pending = [
@@ -220,6 +276,66 @@ class TripState:
             self._reject(event, actor_id, f"Missing confirmations: {', '.join(pending)}")
 
         self._record(event, actor_id, to_phase=TripPhase.EXECUTING)
+        self._current_itinerary = self._itineraries.get(candidate_id)
+
+    def preview_change(
+        self, actor_id: str, base_version: str, rain_event: dict, replacement: dict | None = None
+    ) -> ChangePreview:
+        """在当前执行版本上检查模拟降雨，不修改已确认行程。"""
+        event = "preview_change"
+        self._require_organizer(event, actor_id)
+        self._require_base_version(event, actor_id, base_version)
+        if self.phase is TripPhase.CHANGE_PENDING:
+            self._reject(event, actor_id, "Finish the pending change before making another preview.",
+                         base_version=base_version)
+        if self.phase is not TripPhase.EXECUTING:
+            self._reject(event, actor_id, "Start executing the trip before making a preview.",
+                         base_version=base_version)
+        if self._current_itinerary is None or self._detection_fixture is None:
+            self._reject(event, actor_id, "The trip has no checked itinerary snapshot.",
+                         base_version=base_version)
+
+        try:
+            impact = analyze_rain(
+                self._current_itinerary, rain_event, self._detection_fixture, replacement
+            )
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            self._reject(event, actor_id, f"Invalid change input: {exc}", base_version=base_version)
+        if impact.itinerary is None:
+            self._record(event, actor_id, reason=impact.reason, base_version=base_version)
+            return ChangePreview(None, base_version, impact)
+
+        number = self._preview_number + 1
+        preview = ChangePreview(f"p{number}", base_version, impact)
+        self._record(event, actor_id, to_phase=TripPhase.CHANGE_PENDING, reason=impact.reason,
+                     base_version=base_version, preview_id=preview.preview_id)
+        self._preview_number = number
+        self._pending_change = preview
+        return deepcopy(preview)
+
+    def cancel_change(self, actor_id: str, preview_id: str, base_version: str) -> None:
+        """取消预览后回到执行，保留原版本和成员确认。"""
+        event = "cancel_change"
+        self._require_pending_change(event, actor_id, preview_id, base_version)
+        self._record(event, actor_id, to_phase=TripPhase.EXECUTING, reason="Change canceled.",
+                     base_version=base_version, preview_id=preview_id)
+        self._pending_change = None
+
+    def apply_change(self, actor_id: str, preview_id: str, base_version: str) -> PlanRef:
+        """发起人确认同一预览时，只应用已经过复检的行程。"""
+        event = "apply_change"
+        preview, original = self._require_pending_change(event, actor_id, preview_id, base_version)
+        number = self._version_number + 1
+        plan = PlanRef(original.candidate_id, f"v{number}")
+        self._record(event, actor_id, to_phase=TripPhase.EXECUTING, plan=plan,
+                     reason=preview.impact.reason, base_version=base_version, preview_id=preview_id)
+        self._version_number = number
+        self._set_plan(plan)
+        # v1 的四人确认仍在事件里；v2 的授权由发起人的应用事件单独记录。
+        self._locked_plan = plan
+        self._current_itinerary = preview.impact.itinerary
+        self._pending_change = None
+        return plan
 
     def return_to_collection(self, actor_id: str) -> None:
         """执行前可返回收集，保留成员资料并让旧候选和确认失效。"""
@@ -230,6 +346,8 @@ class TripState:
 
         self._record(event, actor_id, to_phase=TripPhase.COLLECTING)
         self._candidate_results.clear()
+        self._itineraries.clear()
+        self._detection_fixture = None
         self._set_plan(None)
 
     def _set_plan(self, plan: PlanRef | None) -> None:
@@ -240,6 +358,39 @@ class TripState:
     def _require_organizer(self, event: str, actor_id: str) -> None:
         if actor_id != self._organizer_id:
             self._reject(event, actor_id, "Only the organizer can perform this action.")
+
+    def _require_candidate_publication(self, actor_id: str) -> None:
+        event = "open_candidates"
+        self._require_organizer(event, actor_id)
+        if self.phase is not TripPhase.COLLECTING:
+            self._reject(event, actor_id, "Candidate selection can only open from collection.")
+        pending = self.pending_member_ids
+        if pending:
+            self._reject(event, actor_id, f"Missing member submissions: {', '.join(pending)}")
+
+    def _require_base_version(
+        self, event: str, actor_id: str, base_version: str, preview_id: str | None = None
+    ) -> PlanRef:
+        plan = self.locked_plan
+        if plan is None:
+            self._reject(event, actor_id, "The trip does not have a locked plan.",
+                         base_version=base_version, preview_id=preview_id)
+        if plan.version != base_version:
+            self._reject(event, actor_id, f"Base version {base_version} is stale; current is {plan.version}.",
+                         base_version=base_version, preview_id=preview_id)
+        return plan
+
+    def _require_pending_change(
+        self, event: str, actor_id: str, preview_id: str, base_version: str
+    ) -> tuple[ChangePreview, PlanRef]:
+        self._require_organizer(event, actor_id)
+        plan = self._require_base_version(event, actor_id, base_version, preview_id)
+        preview = self._pending_change
+        if (self.phase is not TripPhase.CHANGE_PENDING or preview is None
+                or preview.preview_id != preview_id):
+            self._reject(event, actor_id, "The requested change preview is no longer active.",
+                         base_version=base_version, preview_id=preview_id)
+        return preview, plan
 
     def _require_current_plan(
         self, event: str, actor_id: str, candidate_id: str, version: str
@@ -256,8 +407,11 @@ class TripState:
             )
         return plan
 
-    def _reject(self, event: str, actor_id: str, reason: str) -> NoReturn:
-        self._record(event, actor_id, reason=reason)
+    def _reject(
+        self, event: str, actor_id: str, reason: str, *, base_version: str | None = None,
+        preview_id: str | None = None,
+    ) -> NoReturn:
+        self._record(event, actor_id, reason=reason, base_version=base_version, preview_id=preview_id)
         raise RuntimeError(reason)
 
     def _record(
@@ -268,6 +422,8 @@ class TripState:
         to_phase: TripPhase | None = None,
         plan: PlanRef | None = None,
         reason: str | None = None,
+        base_version: str | None = None,
+        preview_id: str | None = None,
     ) -> TripEvent:
         next_phase = self.phase if to_phase is None else to_phase
         plan = self.selected_plan if plan is None else plan
@@ -280,6 +436,8 @@ class TripState:
             plan_version=None if plan is None else plan.version,
             candidate_id=None if plan is None else plan.candidate_id,
             reason=reason,
+            base_version=base_version,
+            preview_id=preview_id,
         )
         self._events.append(entry)
         self._phase = next_phase
