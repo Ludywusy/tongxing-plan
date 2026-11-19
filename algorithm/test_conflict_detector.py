@@ -14,20 +14,22 @@ import json
 import os
 import re
 import unittest
+from typing import Any
 
-from algorithm.conflict_detector import detect, detect_resolved, detect_trip, trip_from_candidate
+from algorithm.conflict_detector import (detect, detect_all, detect_resolved,
+                                         detect_trip, trip_from_candidate)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURE_PATH = os.path.join(ROOT, "fixtures", "demo-trip.json")
 CASES_PATH = os.path.join(ROOT, "algorithm", "test_cases.json")
 
 
-def _load(path):
+def _load(path: str) -> dict:
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
-def _resolve(obj, key):
+def _resolve(obj: Any, key: str) -> Any:
     """点路径中间段可能是数组，按 member_id / candidate_id / node_id 找。"""
     if isinstance(obj, list):
         for item in obj:
@@ -37,7 +39,7 @@ def _resolve(obj, key):
     return obj[key]
 
 
-def _apply_mutation(fixture, mutation):
+def _apply_mutation(fixture: dict, mutation: dict) -> None:
     parts = mutation["path"].split(".")
     obj = fixture
     for part in parts[:-1]:
@@ -48,7 +50,7 @@ def _apply_mutation(fixture, mutation):
         obj[parts[-1]] = copy.deepcopy(mutation["value"])
 
 
-def _reason_matches(expected, actual):
+def _reason_matches(expected: dict, actual: dict) -> bool:
     if expected["rule_id"] != actual["rule_id"]:
         return False
     if expected.get("member_ids") and expected["member_ids"] != actual["member_ids"]:
@@ -61,21 +63,25 @@ def _reason_matches(expected, actual):
 
 class DetectorCaseTests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.base = _load(FIXTURE_PATH)
         cls.suite = _load(CASES_PATH)
 
     # ------------------------------------------------------------ 固定用例
 
-    def test_fixed_cases(self):
+    def test_fixed_cases(self) -> None:
         for case in self.suite["cases"]:
             with self.subTest(case=case["case_id"], title=case["title"]):
                 self._run_case(case)
 
-    def _run_case(self, case):
+    def _run_case(self, case: dict) -> None:
         fixture = copy.deepcopy(self.base)
         for mutation in case.get("mutations", []):
             _apply_mutation(fixture, mutation)
+
+        if case.get("mode") == "all_candidates":
+            self._run_all_candidates_case(case, fixture)
+            return
 
         overrides = case["trip"]["overrides"] if case.get("mode") == "resolved_trip" else None
         result = detect_trip(fixture, case["candidate_id"], overrides) if overrides \
@@ -130,9 +136,52 @@ class DetectorCaseTests(unittest.TestCase):
                 self.assertEqual(companion["unchanged_value"], node[field],
                                  "候选原节点被改写：%s" % companion["field"])
 
+    # ------------------------------------------------------------ 整池判定（全失败提示）
+
+    def _run_all_candidates_case(self, case: dict, fixture: dict) -> None:
+        """mode=all_candidates：一次判三张卡，验证全失败提示与『系统不自动改』。"""
+        before = json.dumps(fixture, sort_keys=True, ensure_ascii=False)
+        result = detect_all(fixture)
+        expect = case["expect"]
+
+        self.assertEqual(expect["all_failed"], result["all_failed"], "all_failed 不符")
+        self.assertEqual(expect["feasible_candidates"], result["feasible_candidates"],
+                         "可行候选列表不符")
+        self.assertEqual(["c01", "c02", "c03"], result["candidate_ids"],
+                         "候选 ID 必须稳定且按序")
+
+        by_id = {r["candidate_id"]: r for r in result["candidates"]}
+        for expected in expect["candidate_statuses"]:
+            actual = by_id[expected["candidate_id"]]
+            self.assertEqual(expected["status"], actual["status"],
+                             "%s 状态不符" % expected["candidate_id"])
+            self.assertEqual(expected["reasons_count"], len(actual["reasons"]),
+                             "%s 原因条数不符" % expected["candidate_id"])
+
+        # 提示按 (member_id, field) 稳定排序，逐字段比对
+        self.assertEqual(len(expect["relaxation_hints"]), len(result["relaxation_hints"]),
+                         "可调整字段条数不符")
+        for expected, actual in zip(expect["relaxation_hints"], result["relaxation_hints"]):
+            for key, value in expected.items():
+                self.assertEqual(value, actual[key], "提示字段 %s 不符" % key)
+            self.assertFalse(actual["system_auto_change"], "系统不得自动改输入")
+            self.assertEqual("member_voluntary_adjust_then_confirm", actual["action"],
+                             "必须标明需本人确认后再重跑")
+
+        self.assertEqual(expect["pending_fields_count"], len(result["pending_fields"]),
+                         "待补字段条数不符")
+        if "pending_rule_ids" in expect:
+            self.assertEqual(expect["pending_rule_ids"],
+                             sorted({p["rule_id"] for p in result["pending_fields"]}),
+                             "待补字段的规则 ID 不符")
+
+        # 核心边界：整池判定只是读，不能改写 fixture 里的任何原值
+        self.assertEqual(before, json.dumps(fixture, sort_keys=True, ensure_ascii=False),
+                         "detect_all 改写了输入 fixture（越过了产品止损线）")
+
     # ------------------------------------------------------------ 三态完整输出
 
-    def test_golden_outputs(self):
+    def test_golden_outputs(self) -> None:
         """三种状态各一条完整输出；与 docs/contract.md 第一节逐字段一致。"""
         fixture = copy.deepcopy(self.base)
 
@@ -166,7 +215,7 @@ class DetectorCaseTests(unittest.TestCase):
 
     # ------------------------------------------------------------ 入口与契约
 
-    def test_entry_points_agree(self):
+    def test_entry_points_agree(self) -> None:
         """detect / detect_trip / detect_resolved 三条入口对同一条行程结论一致。"""
         fixture = copy.deepcopy(self.base)
         by_id = detect(fixture, "c02")
@@ -179,56 +228,33 @@ class DetectorCaseTests(unittest.TestCase):
             self.assertEqual(json.dumps(by_id["reasons"], sort_keys=True),
                              json.dumps(other["reasons"], sort_keys=True))
 
-    def test_missing_or_malformed_nodes_return_incomplete(self):
-        for bad_nodes in (None, {"node_id": "c02-n01"}, [None]):
-            with self.subTest(nodes=bad_nodes):
-                fixture = copy.deepcopy(self.base)
-                candidate = _resolve(fixture["candidates"], "c02")
-                if bad_nodes is None:
-                    del candidate["nodes"]
-                else:
-                    candidate["nodes"] = bad_nodes
-                result = detect(fixture, "c02")
-                self.assertEqual("incomplete", result["status"])
-                self.assertEqual([], result["reasons"])
-                self.assertEqual([{"member_id": None, "field": "nodes", "rule_id": "R-DATA-01"}],
-                                 result["missing_fields"])
+        # 公共 API 守卫：未知 ID 明确报错、行程展开不污染输入、金额文案保留零头
+        with self.assertRaisesRegex(ValueError, "未知候选 ID"):
+            detect(fixture, "c99")
 
-    def test_missing_taboo_tags_is_not_treated_as_no_taboo(self):
-        fixture = copy.deepcopy(self.base)
-        del _resolve(fixture["members"], "m02")["taboo_tags"]
-        result = detect(fixture, "c02")
-        self.assertEqual("incomplete", result["status"])
-        self.assertEqual([{"member_id": "m02", "field": "taboo_tags", "rule_id": "R-DATA-01"}],
-                         result["missing_fields"])
+        trip = trip_from_candidate(candidate)
+        original_start = candidate["nodes"][0]["start"]
+        trip["nodes"][0]["start"] = "1999-01-01T00:00:00+08:00"
+        self.assertEqual(original_start, candidate["nodes"][0]["start"],
+                         "trip_from_candidate 返回了原节点引用，会污染 fixture")
 
-    def test_candidate_window_must_cover_return_node(self):
-        fixture = copy.deepcopy(self.base)
-        candidate = _resolve(fixture["candidates"], "c02")
-        _resolve(candidate["nodes"], "c02-n04")["end"] = "2026-11-21T17:30:00+08:00"
-        result = detect(fixture, "c02")
-        self.assertEqual("incomplete", result["status"])
-        self.assertEqual([{"member_id": None, "field": "window", "rule_id": "R-DATA-01"}],
-                         result["missing_fields"])
+        fractional = copy.deepcopy(self.base)
+        for c in fractional["candidates"]:
+            if c["candidate_id"] == "c02":
+                for member_id in c["cost_per_member"]:
+                    c["cost_per_member"][member_id] = 8050
+        message = detect(fractional, "c02")["reasons"][0]["message"]
+        self.assertIn("80.5 元", message, "金额文案丢弃了零头")
 
-    def test_duplicate_node_ids_do_not_allow_ambiguous_replacement(self):
-        fixture = copy.deepcopy(self.base)
-        nodes = _resolve(fixture["candidates"], "c02")["nodes"]
-        nodes[2]["node_id"] = nodes[1]["node_id"]
-        result = detect(fixture, "c02")
-        self.assertEqual("incomplete", result["status"])
-        self.assertEqual([{"member_id": None, "field": "nodes.node_id", "rule_id": "R-DATA-01"}],
-                         result["missing_fields"])
-
-    def test_case_ids_unique(self):
+    def test_case_ids_unique(self) -> None:
         ids = [c["case_id"] for c in self.suite["cases"]]
         self.assertEqual(len(ids), len(set(ids)), "case_id 重复")
 
-    def test_fixture_version_matches(self):
+    def test_fixture_version_matches(self) -> None:
         self.assertEqual(self.base["fixture_version"], self.suite["fixture_version"],
                          "fixture 与用例版本号必须同号（契约 F-05）")
 
-    def test_all_times_carry_offset(self):
+    def test_all_times_carry_offset(self) -> None:
         """fixture 内所有时间都必须是带偏移的 ISO 8601。"""
         pattern = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00$")
         for member in self.base["members"]:

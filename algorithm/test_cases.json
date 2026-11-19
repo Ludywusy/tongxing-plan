@@ -365,6 +365,64 @@
         ]
       },
       "note": "同一条规则覆盖『HH:MM』与『缺 nodes』两种：格式非法或缺字段都先判 incomplete，再谈可行不可行。"
+    },
+    {
+      "case_id": "TC-020",
+      "title": "全部候选失败：三张卡同时不可行，提示可自愿调整字段并保留原值",
+      "mode": "all_candidates",
+      "mutations": [
+        { "path": "members.m01.budget_cap", "value": 1000 },
+        { "path": "members.m03.allowed_transport", "value": ["walk"] }
+      ],
+      "expect": {
+        "all_failed": true,
+        "feasible_candidates": [],
+        "candidate_statuses": [
+          { "candidate_id": "c01", "status": "infeasible", "reasons_count": 2 },
+          { "candidate_id": "c02", "status": "infeasible", "reasons_count": 2 },
+          { "candidate_id": "c03", "status": "infeasible", "reasons_count": 2 }
+        ],
+        "relaxation_hints": [
+          {
+            "member_id": "m01",
+            "field": "members.m01.budget_cap",
+            "current_value": 1000,
+            "rule_ids": ["R-BUD-01"],
+            "blocked_candidates": ["c01", "c02", "c03"]
+          },
+          {
+            "member_id": "m03",
+            "field": "members.m03.allowed_transport",
+            "current_value": ["walk"],
+            "rule_ids": ["R-TRANS-01"],
+            "blocked_candidates": ["c01", "c02", "c03"]
+          }
+        ],
+        "pending_fields_count": 0
+      },
+      "note": "执行规格第 5 条：全失败时提示哪个字段可由用户自愿调整，保留原值及确认动作。检测器只列出『成员本人声明的输入』（预算上限、允许交通），绝不改候选侧的费用/时段/交通/标签——改那些等于系统替用户造方案。测试同时断言输入 fixture 在调用前后逐字不变（system_auto_change=false）。"
+    },
+    {
+      "case_id": "TC-021",
+      "title": "全失败但含缺字段：只提示补填，不提示放宽约束",
+      "mode": "all_candidates",
+      "mutations": [
+        { "path": "members.m01.budget_cap", "value": 1000 },
+        { "path": "members.m02.budget_cap", "op": "delete" }
+      ],
+      "expect": {
+        "all_failed": true,
+        "feasible_candidates": [],
+        "candidate_statuses": [
+          { "candidate_id": "c01", "status": "incomplete", "reasons_count": 0 },
+          { "candidate_id": "c02", "status": "incomplete", "reasons_count": 0 },
+          { "candidate_id": "c03", "status": "incomplete", "reasons_count": 0 }
+        ],
+        "relaxation_hints": [],
+        "pending_fields_count": 3,
+        "pending_rule_ids": ["R-DATA-01"]
+      },
+      "note": "三态优先级边界：incomplete 压过 infeasible。连字段都没填齐时谈『要不要放宽预算』会把人引错方向，所以 pending_fields 只收补填项，relaxation_hints 必须为空。"
     }
   ]
 }
