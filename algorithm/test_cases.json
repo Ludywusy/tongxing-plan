@@ -423,6 +423,37 @@
         "pending_rule_ids": ["R-DATA-01"]
       },
       "note": "三态优先级边界：incomplete 压过 infeasible。连字段都没填齐时谈『要不要放宽预算』会把人引错方向，所以 pending_fields 只收补填项，relaxation_hints 必须为空。"
+    },
+    {
+      "case_id": "TC-022",
+      "title": "降雨替代节点缺时间字段：不抛异常，判 incomplete 并列出结构化缺项",
+      "mode": "resolved_trip",
+      "candidate_id": "c02",
+      "trip": {
+        "version": "v2",
+        "based_on": "v1",
+        "overrides": [
+          {
+            "replaces": "c02-n02",
+            "node": {
+              "node_id": "c02-n02-r1",
+              "end": "2026-11-21T15:00:00+08:00",
+              "kind": "activity",
+              "place_tag": "gallery_indoor",
+              "indoor": true
+            }
+          }
+        ]
+      },
+      "expect": {
+        "status": "incomplete",
+        "reasons_count": 0,
+        "missing_fields": [
+          { "member_id": null, "field": "nodes.c02-n02-r1", "rule_id": "R-DATA-01" },
+          { "member_id": null, "field": "window", "rule_id": "R-DATA-01" }
+        ]
+      },
+      "note": "组长检查结论第 4 条。旧写法 window_from_nodes 直接 min(parse_time(n['start']))，替代节点缺 start 会抛 KeyError 让整程重检崩掉。现改为返回空窗，由完整性检查同时报 window 与 nodes.c02-n02-r1 两条 R-DATA-01；reasons 为空，符合 incomplete 优先、不夹带可行/不可行原因。"
     }
   ]
 }

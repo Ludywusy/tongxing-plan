@@ -163,7 +163,10 @@ __all__ = [
 
 
 def _canon(payload: Any) -> str:
-    return json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    # default=str 是防御性兜底：行程层传入非 JSON 类型（例如误把 datetime 塞进替代
+    # 节点）时，指纹计算不能先崩掉；正常输入全为字符串/数字，不会触发 default。
+    return json.dumps(payload, sort_keys=True, ensure_ascii=False,
+                      separators=(",", ":"), default=str)
 
 
 def fingerprint(payload: Any) -> str:
@@ -381,7 +384,13 @@ def expand_nodes(nodes: Any, overrides: Sequence[Mapping[str, Any]] | None) -> A
     """行程层覆盖记录 -> 展开后的节点序列；返回深拷贝，原节点绝不被修改。"""
     if not isinstance(nodes, list):
         return nodes  # 留给完整性检查返回结构化缺项。
-    replaces = {o["replaces"]: o["node"] for o in overrides or []}
+    # 覆盖记录本身也可能不完整（缺 replaces / node）。跳过不完整的项而不是抛
+    # KeyError，让后续完整性检查以结构化缺项的方式给出结论。
+    replaces = {
+        o["replaces"]: o["node"]
+        for o in overrides or []
+        if isinstance(o, Mapping) and "replaces" in o and "node" in o
+    }
     return [
         deepcopy(replaces.get(n["node_id"], n))
         if isinstance(n, dict) and isinstance(n.get("node_id"), str)
@@ -391,11 +400,23 @@ def expand_nodes(nodes: Any, overrides: Sequence[Mapping[str, Any]] | None) -> A
 
 
 def window_from_nodes(nodes: Sequence[Mapping[str, Any]]) -> dict[str, str]:
-    """整条行程的全程时间窗 = 最早节点开始 ~ 最晚节点结束，统一输出 ISO 字符串。"""
-    return {
-        "start": min(parse_time(n["start"]) for n in nodes).isoformat(),
-        "end": max(parse_time(n["end"]) for n in nodes).isoformat(),
-    }
+    """整条行程的全程时间窗 = 最早节点开始 ~ 最晚节点结束，统一输出 ISO 字符串。
+
+    任一节点缺 start/end 或格式非法时**不抛异常**：返回空窗，交给
+    check_completeness 统一判 incomplete 并列出结构化缺项。降雨替代节点来自
+    行程层覆盖记录，字段可能不全，不能让整程重检在算窗这一步直接崩掉。
+    """
+    try:
+        starts = [parse_time(n["start"]) for n in nodes]
+        ends = [parse_time(n["end"]) for n in nodes]
+        if not starts or not ends:
+            return {}
+        return {
+            "start": min(starts).isoformat(),
+            "end": max(ends).isoformat(),
+        }
+    except (KeyError, TypeError, ValueError):
+        return {}
 
 
 def trip_from_candidate(

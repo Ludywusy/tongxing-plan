@@ -246,6 +246,34 @@ class DetectorCaseTests(unittest.TestCase):
         message = detect(fractional, "c02")["reasons"][0]["message"]
         self.assertIn("80.5 元", message, "金额文案丢弃了零头")
 
+    def test_replacement_missing_time_is_incomplete(self) -> None:
+        """降雨替代节点时间缺字段/格式非法时不得抛异常，须返回结构化 incomplete。
+
+        对应组长检查结论第 4 条与固定用例 TC-022：旧实现在 window_from_nodes
+        里直接 min(parse_time(n["start"]))，替代节点缺 start 会抛 KeyError 崩掉
+        整程重检；现在统一交给完整性检查报 R-DATA-01。
+        """
+        fixture = copy.deepcopy(self.base)
+        base_node = {"node_id": "c02-n02-r1", "kind": "activity",
+                     "place_tag": "gallery_indoor", "indoor": True}
+
+        missing_start = [{"replaces": "c02-n02",
+                          "node": dict(base_node, end="2026-11-21T15:00:00+08:00")}]
+        result = detect_trip(fixture, "c02", missing_start)  # 不抛异常本身就是断言
+        self.assertEqual("incomplete", result["status"])
+        self.assertEqual([], result["reasons"])
+        fields = [m["field"] for m in result["missing_fields"]]
+        self.assertIn("window", fields)
+        self.assertIn("nodes.c02-n02-r1", fields)
+
+        bad_offset = [{"replaces": "c02-n02",
+                       "node": dict(base_node, start="14:00", end="15:00")}]
+        self.assertEqual("incomplete", detect_trip(fixture, "c02", bad_offset)["status"])
+
+        # 覆盖记录本身缺 node 也不能崩，跳过不完整的项即可。
+        self.assertEqual("feasible",
+                         detect_trip(fixture, "c02", [{"replaces": "c02-n02"}])["status"])
+
     def test_case_ids_unique(self) -> None:
         ids = [c["case_id"] for c in self.suite["cases"]]
         self.assertEqual(len(ids), len(set(ids)), "case_id 重复")
