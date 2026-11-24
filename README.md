@@ -8,6 +8,7 @@
 - [演示与离线资料](docs/prototype.md)
 - [共享样例与状态约定](docs/decisions.md)
 - [Flutter 与 FastAPI 接口契约（待复核）](docs/api-contract.md)
+- [第二周共享房间服务启动与联调](docs/week2-backend-run.md)
 - [数据说明](research/README.md)
 
 ## 获取项目
@@ -23,6 +24,7 @@ cd tongxing-plan
 | --- | --- |
 | `docs/` | 使用说明、演示与离线资料入口 |
 | `algorithm/` | 候选约束检测 |
+| `backend/` | FastAPI 共享房间、成员凭证及 SQLite 持久化 |
 | `core/` | 行程状态与变更处理 |
 | `tests/` | 状态及变更测试 |
 | `scripts/` | 演示脚本 |

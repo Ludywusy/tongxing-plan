@@ -1,0 +1,143 @@
+{
+  "checked_on": "2026-11-20",
+  "source_commit": "8cd1f774894da5c654fe722604b463b8a7f79805",
+  "python_version": "3.13.9",
+  "tests": [
+    {
+      "command": "python -m unittest discover -s algorithm -p test_*.py",
+      "returncode": 0,
+      "output": "......\n----------------------------------------------------------------------\nRan 6 tests in 0.047s\n\nOK\n"
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_*.py",
+      "returncode": 0,
+      "output": "............\n----------------------------------------------------------------------\nRan 12 tests in 0.027s\n\nOK\n"
+    }
+  ],
+  "demo": {
+    "command": "python -m scripts.demo_trip_flow",
+    "identical_two_runs": true,
+    "sha256": "a00cdd552d2db87adf856e35938ed6a9f5c9a429caf1ca984855755490f0e8f3",
+    "output": "同行计划 | 合成样例 1.1 | 兰州大学城关校区\r\ncollecting: 4/4 已提交\r\ncandidates: B 硬约束检查\r\n  c01 摄影体验: infeasible\r\n    R-BUD-01 m01: 8100 分超过 8000 分\r\n  c02 广场与展览: feasible\r\n  c03 室内手作: feasible\r\nconfirming: c02/v1\r\n  m01 已确认 (1/4)\r\n  m02 已确认 (2/4)\r\n  m03 已确认 (3/4)\r\n  m04 已确认 (4/4)\r\nexecuting: c02/v1\r\n[模拟] rain-01 | 固定演示数据 | 2026-11-21T13:45:00+08:00\r\n  雨窗: 2026-11-21T14:00:00+08:00 ～ 2026-11-21T15:00:00+08:00\r\n  受影响: c02-n02\r\n  保留: c02-n01, c02-n03, c02-n04\r\n  理由: c02-n02 是与模拟降雨时间窗重叠的户外活动。室内替代已通过整程硬约束复检。\r\nchange_pending: c02-n02 → c02-n02-r1 | B 复检 feasible | 当前仍是 v1\r\nexecuting: 取消预览，保留 v1\r\nexecuting: c02/v1 → c02/v2\r\n确认记录:\r\n  2026-11-21T13:20:00+08:00 confirm_candidate m01 c02/v1\r\n  2026-11-21T13:20:00+08:00 confirm_candidate m02 c02/v1\r\n  2026-11-21T13:20:00+08:00 confirm_candidate m03 c02/v1\r\n  2026-11-21T13:20:00+08:00 confirm_candidate m04 c02/v1\r\n  2026-11-21T13:46:00+08:00 apply_change m01 c02/v2\r\n"
+  },
+  "fixture_version": "1.1",
+  "fixed_case_count": 21,
+  "candidates": [
+    {
+      "candidate_id": "c01",
+      "fixture_version": "1.1",
+      "input_fingerprint": "dec2d3c4",
+      "status": "infeasible",
+      "reasons": [
+        {
+          "rule_id": "R-BUD-01",
+          "member_ids": [
+            "m01"
+          ],
+          "field": "cost_per_member.m01",
+          "actual": 8100,
+          "threshold": 8000,
+          "message": "m01 承担 81 元，超过上限 80 元 1 元"
+        }
+      ],
+      "missing_fields": []
+    },
+    {
+      "candidate_id": "c02",
+      "fixture_version": "1.1",
+      "input_fingerprint": "0c83fee6",
+      "status": "feasible",
+      "reasons": [],
+      "missing_fields": []
+    },
+    {
+      "candidate_id": "c03",
+      "fixture_version": "1.1",
+      "input_fingerprint": "e974b1e1",
+      "status": "feasible",
+      "reasons": [],
+      "missing_fields": []
+    }
+  ],
+  "incomplete_example": {
+    "candidate_id": "c01",
+    "fixture_version": "1.1",
+    "input_fingerprint": "d20f5e6b",
+    "status": "incomplete",
+    "reasons": [],
+    "missing_fields": [
+      {
+        "member_id": "m01",
+        "field": "budget_basis",
+        "rule_id": "R-DATA-02"
+      }
+    ]
+  },
+  "known_edge": {
+    "reproduction": "Remove c02-n02.start, call detect_trip with c02-n03 override",
+    "exception": "KeyError",
+    "message": "'start'",
+    "status": "pending_B_fix"
+  },
+  "apk": {
+    "file_name": "同行计划_0.2.apk.1",
+    "size_bytes": 92288056,
+    "sha256": "cc390c1fd1597eb4291df5745ba2eef12e3feeae3bf6ce6b90d24d3500084528",
+    "runtime_verified": false,
+    "signature_verified": false,
+    "zip_crc_ok": true,
+    "fixture_version": "1.2",
+    "unchanged_baseline_fields": [
+      "members",
+      "candidates",
+      "rain_event",
+      "rain_replacement"
+    ],
+    "replacement_checks": [
+      {
+        "replacement_id": "rain-gallery",
+        "rule_result": {
+          "candidate_id": "c02",
+          "fixture_version": "1.2",
+          "input_fingerprint": "2a03b9be",
+          "status": "feasible",
+          "reasons": [],
+          "missing_fields": []
+        }
+      },
+      {
+        "replacement_id": "rain-cinema",
+        "rule_result": {
+          "candidate_id": "c02",
+          "fixture_version": "1.2",
+          "input_fingerprint": "cfcf1a27",
+          "status": "feasible",
+          "reasons": [],
+          "missing_fields": []
+        }
+      },
+      {
+        "replacement_id": "rain-museum",
+        "rule_result": {
+          "candidate_id": "c02",
+          "fixture_version": "1.2",
+          "input_fingerprint": "ca2e2f1f",
+          "status": "feasible",
+          "reasons": [],
+          "missing_fields": []
+        }
+      },
+      {
+        "replacement_id": "rain-craft",
+        "rule_result": {
+          "candidate_id": "c02",
+          "fixture_version": "1.2",
+          "input_fingerprint": "260299a7",
+          "status": "feasible",
+          "reasons": [],
+          "missing_fields": []
+        }
+      }
+    ]
+  }
+}
