@@ -1,0 +1,24 @@
+{
+  "source_commit": "3efab7ff40e1485f17ca26d53ea5ca7b3e249565",
+  "apk": "app-debug.apk",
+  "bytes": 94964151,
+  "sha256": "5d43a3d6e758cd81f3c1254fddaffe3572cf720d2f7161d6dc3371fe388de620",
+  "assets": [
+    {
+      "version": "1.1",
+      "fixture": "fixtures/demo-trip.json",
+      "asset": "mobile/assets/demo-trip-1.1.json",
+      "apk_entry": "assets/flutter_assets/assets/demo-trip-1.1.json",
+      "sha256": "20c5afb0a1e1efa53b00a17c71bf03a713b74e605f75c772d2d5e3f657a551ba",
+      "all_match": true
+    },
+    {
+      "version": "1.2",
+      "fixture": "fixtures/demo-trip-1.2.json",
+      "asset": "mobile/assets/demo-trip.json",
+      "apk_entry": "assets/flutter_assets/assets/demo-trip.json",
+      "sha256": "6d7b21d5ce0bbec403d08cc6ede0608a760f0f2a1cdea1e319a03fa59fc4b195",
+      "all_match": true
+    }
+  ]
+}
