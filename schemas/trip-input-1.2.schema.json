@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Ludywusy/tongxing-plan/blob/main/schemas/trip-input-1.2.schema.json",
+  "title": "同行计划共享演示输入",
+  "description": "离线 Android 原型与 Python 检测器共用的固定演示输入。时间必须携带 UTC 偏移；预算和费用使用人民币整数分。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fixture_version", "timezone", "trip_date", "origin", "members", "candidates", "rain_event", "rain_replacement", "rain_replacement_options"],
+  "properties": {
+    "fixture_version": { "type": "string", "const": "1.2" },
+    "timezone": { "type": "string", "const": "Asia/Shanghai" },
+    "trip_date": { "type": "string", "format": "date" },
+    "origin": { "$ref": "#/$defs/place" },
+    "members": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/member" }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "rain_event": { "$ref": "#/$defs/rainEvent" },
+    "rain_replacement": { "$ref": "#/$defs/rainReplacement" },
+    "rain_replacement_options": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/rainReplacementOption" }
+    }
+  },
+  "$defs": {
+    "dateTimeOffset": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$",
+      "description": "ISO 8601 date-time with an explicit UTC offset."
+    },
+    "place": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "$ref": "#/$defs/dateTimeOffset" },
+        "end": { "$ref": "#/$defs/dateTimeOffset" }
+      }
+    },
+    "budgetBasis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["includes_transport", "scope", "share_rule"],
+      "properties": {
+        "includes_transport": { "type": "boolean" },
+        "scope": { "enum": ["per_person", "per_group"] },
+        "share_rule": { "type": ["string", "null"] }
+      },
+      "description": "A per-group budget requires a non-empty share_rule."
+    },
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["member_id", "display_name", "available_windows", "budget_cap", "budget_basis", "allowed_transport", "taboo_tags", "must_visit_tags", "interest_tags", "interest_weight", "walk_tolerance", "declared_level"],
+      "properties": {
+        "member_id": { "type": "string", "pattern": "^m[0-9]{2}$" },
+        "display_name": { "type": "string", "minLength": 1 },
+        "available_windows": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/window" } },
+        "budget_cap": { "type": "integer", "minimum": 0, "description": "RMB cents per person." },
+        "budget_basis": { "$ref": "#/$defs/budgetBasis" },
+        "allowed_transport": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" }, "description": "Supported values include metro, walk, taxi, bicycle and other. When other is selected, custom_transport stores the user's free text." },
+        "custom_transport": { "type": "string" },
+        "taboo_tags": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "must_visit_tags": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "interest_tags": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "interest_weight": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "walk_tolerance": { "type": "integer", "minimum": 0, "description": "Meters." },
+        "declared_level": { "type": "object", "additionalProperties": { "enum": ["must", "prefer", "none"] } }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "note", "retrieved_at"],
+      "properties": {
+        "type": { "type": "string", "enum": ["simulated", "public", "user_provided"] },
+        "note": { "type": "string", "minLength": 1 },
+        "retrieved_at": { "$ref": "#/$defs/dateTimeOffset" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["node_id", "start", "end", "kind"],
+      "properties": {
+        "node_id": { "type": "string", "pattern": "^c[0-9]{2}-n[0-9]{2}(-r[0-9]+)?$" },
+        "start": { "$ref": "#/$defs/dateTimeOffset" },
+        "end": { "$ref": "#/$defs/dateTimeOffset" },
+        "kind": { "enum": ["transit", "activity"] },
+        "transport": { "type": "string" },
+        "place_tag": { "type": "string" },
+        "indoor": { "type": "boolean" }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "transit" } } }, "then": { "required": ["transport"] } },
+        { "if": { "properties": { "kind": { "const": "activity" } } }, "then": { "required": ["place_tag", "indoor"] } }
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "display_name", "window", "cost_per_member", "nodes", "source", "deprecated"],
+      "properties": {
+        "candidate_id": { "type": "string", "pattern": "^c[0-9]{2}$" },
+        "display_name": { "type": "string", "minLength": 1 },
+        "window": { "$ref": "#/$defs/window" },
+        "cost_per_member": { "type": "object", "minProperties": 4, "additionalProperties": { "type": "integer", "minimum": 0 }, "description": "RMB cents, keyed by member ID." },
+        "nodes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/node" } },
+        "source": { "$ref": "#/$defs/source" },
+        "deprecated": { "type": "boolean" }
+      }
+    },
+    "rainEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "type", "window", "source"],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "type": { "const": "rain" },
+        "window": { "$ref": "#/$defs/window" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "rainReplacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replaces", "node", "cost_per_member"],
+      "properties": {
+        "replaces": { "type": "string", "pattern": "^c[0-9]{2}-n[0-9]{2}$" },
+        "node": { "$ref": "#/$defs/node" },
+        "cost_per_member": { "type": "object", "minProperties": 4, "additionalProperties": { "type": "integer", "minimum": 0 }, "description": "RMB cents, keyed by member ID." }
+      }
+    },
+    "rainReplacementOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replacement_id", "display_name", "replaces", "node", "cost_per_member"],
+      "properties": {
+        "replacement_id": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string", "minLength": 1 },
+        "replaces": { "type": "string", "pattern": "^c[0-9]{2}-n[0-9]{2}$" },
+        "node": { "$ref": "#/$defs/node" },
+        "cost_per_member": { "type": "object", "minProperties": 4, "additionalProperties": { "type": "integer", "minimum": 0 } }
+      }
+    }
+  }
+}

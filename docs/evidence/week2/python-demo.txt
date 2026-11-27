@@ -1,0 +1,27 @@
+同行计划 | 合成样例 1.1 | 兰州大学城关校区
+collecting: 4/4 已提交
+candidates: B 硬约束检查
+  c01 摄影体验: infeasible
+    R-BUD-01 m01: 8100 分超过 8000 分
+  c02 广场与展览: feasible
+  c03 室内手作: feasible
+confirming: c02/v1
+  m01 已确认 (1/4)
+  m02 已确认 (2/4)
+  m03 已确认 (3/4)
+  m04 已确认 (4/4)
+executing: c02/v1
+[模拟] rain-01 | 固定演示数据 | 2026-11-21T13:45:00+08:00
+  雨窗: 2026-11-21T14:00:00+08:00 ～ 2026-11-21T15:00:00+08:00
+  受影响: c02-n02
+  保留: c02-n01, c02-n03, c02-n04
+  理由: c02-n02 是与模拟降雨时间窗重叠的户外活动。室内替代已通过整程硬约束复检。
+change_pending: c02-n02 → c02-n02-r1 | B 复检 feasible | 当前仍是 v1
+executing: 取消预览，保留 v1
+executing: c02/v1 → c02/v2
+确认记录:
+  2026-11-21T13:20:00+08:00 confirm_candidate m01 c02/v1
+  2026-11-21T13:20:00+08:00 confirm_candidate m02 c02/v1
+  2026-11-21T13:20:00+08:00 confirm_candidate m03 c02/v1
+  2026-11-21T13:20:00+08:00 confirm_candidate m04 c02/v1
+  2026-11-21T13:46:00+08:00 apply_change m01 c02/v2

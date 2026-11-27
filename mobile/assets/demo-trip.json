@@ -1,0 +1,405 @@
+{
+  "fixture_version": "1.2",
+  "timezone": "Asia/Shanghai",
+  "trip_date": "2026-11-21",
+  "origin": {
+    "id": "loc-campus",
+    "name": "兰州大学城关校区"
+  },
+  "members": [
+    {
+      "member_id": "m01",
+      "display_name": "甲",
+      "available_windows": [
+        {
+          "start": "2026-11-21T13:00:00+08:00",
+          "end": "2026-11-21T17:30:00+08:00"
+        }
+      ],
+      "budget_cap": 8000,
+      "budget_basis": {
+        "includes_transport": true,
+        "scope": "per_person",
+        "share_rule": null
+      },
+      "allowed_transport": [
+        "metro",
+        "walk"
+      ],
+      "taboo_tags": [],
+      "must_visit_tags": [],
+      "interest_tags": [
+        "photo"
+      ],
+      "interest_weight": {
+        "photo": 3
+      },
+      "walk_tolerance": 3000,
+      "declared_level": {
+        "must_return_by": "must",
+        "budget_cap": "must",
+        "transport": "prefer",
+        "must_visit": "none",
+        "walk": "prefer"
+      }
+    },
+    {
+      "member_id": "m02",
+      "display_name": "乙",
+      "available_windows": [
+        {
+          "start": "2026-11-21T13:30:00+08:00",
+          "end": "2026-11-21T18:00:00+08:00"
+        }
+      ],
+      "budget_cap": 9000,
+      "budget_basis": {
+        "includes_transport": true,
+        "scope": "per_person",
+        "share_rule": null
+      },
+      "allowed_transport": [
+        "metro",
+        "walk"
+      ],
+      "taboo_tags": [],
+      "must_visit_tags": [],
+      "interest_tags": [
+        "outdoor"
+      ],
+      "interest_weight": {
+        "outdoor": 2
+      },
+      "walk_tolerance": 4000,
+      "declared_level": {
+        "must_return_by": "must",
+        "budget_cap": "must",
+        "transport": "must",
+        "must_visit": "none",
+        "walk": "prefer"
+      }
+    },
+    {
+      "member_id": "m03",
+      "display_name": "丙",
+      "available_windows": [
+        {
+          "start": "2026-11-21T13:00:00+08:00",
+          "end": "2026-11-21T17:00:00+08:00"
+        }
+      ],
+      "budget_cap": 10000,
+      "budget_basis": {
+        "includes_transport": true,
+        "scope": "per_person",
+        "share_rule": null
+      },
+      "allowed_transport": [
+        "metro",
+        "walk"
+      ],
+      "taboo_tags": [],
+      "must_visit_tags": [],
+      "interest_tags": [
+        "exhibition"
+      ],
+      "interest_weight": {
+        "exhibition": 3
+      },
+      "walk_tolerance": 2000,
+      "declared_level": {
+        "must_return_by": "must",
+        "budget_cap": "must",
+        "transport": "must",
+        "must_visit": "none",
+        "walk": "must"
+      }
+    },
+    {
+      "member_id": "m04",
+      "display_name": "丁",
+      "available_windows": [
+        {
+          "start": "2026-11-21T13:30:00+08:00",
+          "end": "2026-11-21T17:30:00+08:00"
+        }
+      ],
+      "budget_cap": 12000,
+      "budget_basis": {
+        "includes_transport": true,
+        "scope": "per_person",
+        "share_rule": null
+      },
+      "allowed_transport": [
+        "metro",
+        "walk"
+      ],
+      "taboo_tags": [],
+      "must_visit_tags": [],
+      "interest_tags": [
+        "craft"
+      ],
+      "interest_weight": {
+        "craft": 2
+      },
+      "walk_tolerance": 5000,
+      "declared_level": {
+        "must_return_by": "must",
+        "budget_cap": "must",
+        "transport": "must",
+        "must_visit": "none",
+        "walk": "prefer"
+      }
+    }
+  ],
+  "rain_event": {
+    "event_id": "rain-01",
+    "type": "rain",
+    "window": {
+      "start": "2026-11-21T14:00:00+08:00",
+      "end": "2026-11-21T15:00:00+08:00"
+    },
+    "source": {
+      "type": "simulated",
+      "note": "固定演示数据",
+      "retrieved_at": "2026-11-21T13:45:00+08:00"
+    }
+  },
+  "rain_replacement": {
+    "replaces": "c02-n02",
+    "node": {
+      "node_id": "c02-n02-r1",
+      "start": "2026-11-21T14:00:00+08:00",
+      "end": "2026-11-21T15:00:00+08:00",
+      "kind": "activity",
+      "place_tag": "gallery_indoor",
+      "indoor": true
+    },
+    "cost_per_member": {
+      "m01": 6400,
+      "m02": 6400,
+      "m03": 6400,
+      "m04": 6400
+    }
+  },
+  "candidates": [
+    {
+      "candidate_id": "c01",
+      "display_name": "摄影体验",
+      "window": {
+        "start": "2026-11-21T13:30:00+08:00",
+        "end": "2026-11-21T16:45:00+08:00"
+      },
+      "cost_per_member": {
+        "m01": 8100,
+        "m02": 7500,
+        "m03": 7500,
+        "m04": 7500
+      },
+      "nodes": [
+        {
+          "node_id": "c01-n01",
+          "start": "2026-11-21T13:30:00+08:00",
+          "end": "2026-11-21T14:00:00+08:00",
+          "kind": "transit",
+          "transport": "metro"
+        },
+        {
+          "node_id": "c01-n02",
+          "start": "2026-11-21T14:00:00+08:00",
+          "end": "2026-11-21T16:00:00+08:00",
+          "kind": "activity",
+          "place_tag": "photo_studio",
+          "indoor": true
+        },
+        {
+          "node_id": "c01-n03",
+          "start": "2026-11-21T16:00:00+08:00",
+          "end": "2026-11-21T16:45:00+08:00",
+          "kind": "transit",
+          "transport": "metro"
+        }
+      ],
+      "source": {
+        "type": "simulated",
+        "note": "固定演示数据",
+        "retrieved_at": "2026-11-14T00:00:00+08:00"
+      },
+      "deprecated": false
+    },
+    {
+      "candidate_id": "c02",
+      "display_name": "广场与展览",
+      "window": {
+        "start": "2026-11-21T13:30:00+08:00",
+        "end": "2026-11-21T17:00:00+08:00"
+      },
+      "cost_per_member": {
+        "m01": 6400,
+        "m02": 6400,
+        "m03": 6400,
+        "m04": 6400
+      },
+      "nodes": [
+        {
+          "node_id": "c02-n01",
+          "start": "2026-11-21T13:30:00+08:00",
+          "end": "2026-11-21T14:00:00+08:00",
+          "kind": "transit",
+          "transport": "metro"
+        },
+        {
+          "node_id": "c02-n02",
+          "start": "2026-11-21T14:00:00+08:00",
+          "end": "2026-11-21T15:00:00+08:00",
+          "kind": "activity",
+          "place_tag": "plaza",
+          "indoor": false
+        },
+        {
+          "node_id": "c02-n03",
+          "start": "2026-11-21T15:00:00+08:00",
+          "end": "2026-11-21T16:30:00+08:00",
+          "kind": "activity",
+          "place_tag": "gallery",
+          "indoor": true
+        },
+        {
+          "node_id": "c02-n04",
+          "start": "2026-11-21T16:30:00+08:00",
+          "end": "2026-11-21T17:00:00+08:00",
+          "kind": "transit",
+          "transport": "metro"
+        }
+      ],
+      "source": {
+        "type": "simulated",
+        "note": "固定演示数据",
+        "retrieved_at": "2026-11-14T00:00:00+08:00"
+      },
+      "deprecated": false
+    },
+    {
+      "candidate_id": "c03",
+      "display_name": "室内手作",
+      "window": {
+        "start": "2026-11-21T13:45:00+08:00",
+        "end": "2026-11-21T16:45:00+08:00"
+      },
+      "cost_per_member": {
+        "m01": 7200,
+        "m02": 7200,
+        "m03": 7200,
+        "m04": 7200
+      },
+      "nodes": [
+        {
+          "node_id": "c03-n01",
+          "start": "2026-11-21T13:45:00+08:00",
+          "end": "2026-11-21T14:15:00+08:00",
+          "kind": "transit",
+          "transport": "metro"
+        },
+        {
+          "node_id": "c03-n02",
+          "start": "2026-11-21T14:15:00+08:00",
+          "end": "2026-11-21T16:15:00+08:00",
+          "kind": "activity",
+          "place_tag": "workshop",
+          "indoor": true
+        },
+        {
+          "node_id": "c03-n03",
+          "start": "2026-11-21T16:15:00+08:00",
+          "end": "2026-11-21T16:45:00+08:00",
+          "kind": "transit",
+          "transport": "metro"
+        }
+      ],
+      "source": {
+        "type": "simulated",
+        "note": "固定演示数据",
+        "retrieved_at": "2026-11-14T00:00:00+08:00"
+      },
+      "deprecated": false
+    }
+  ],
+  "rain_replacement_options": [
+    {
+      "replacement_id": "rain-gallery",
+      "display_name": "室内摄影展厅",
+      "replaces": "c02-n02",
+      "node": {
+        "node_id": "c02-n02-r1",
+        "start": "2026-11-21T14:00:00+08:00",
+        "end": "2026-11-21T15:00:00+08:00",
+        "kind": "activity",
+        "place_tag": "gallery_indoor",
+        "indoor": true
+      },
+      "cost_per_member": {
+        "m01": 6400,
+        "m02": 6400,
+        "m03": 6400,
+        "m04": 6400
+      }
+    },
+    {
+      "replacement_id": "rain-cinema",
+      "display_name": "电影院",
+      "replaces": "c02-n02",
+      "node": {
+        "node_id": "c02-n02-r2",
+        "start": "2026-11-21T14:00:00+08:00",
+        "end": "2026-11-21T15:00:00+08:00",
+        "kind": "activity",
+        "place_tag": "cinema",
+        "indoor": true
+      },
+      "cost_per_member": {
+        "m01": 6400,
+        "m02": 6400,
+        "m03": 6400,
+        "m04": 6400
+      }
+    },
+    {
+      "replacement_id": "rain-museum",
+      "display_name": "室内博物馆",
+      "replaces": "c02-n02",
+      "node": {
+        "node_id": "c02-n02-r3",
+        "start": "2026-11-21T14:00:00+08:00",
+        "end": "2026-11-21T15:00:00+08:00",
+        "kind": "activity",
+        "place_tag": "museum",
+        "indoor": true
+      },
+      "cost_per_member": {
+        "m01": 6400,
+        "m02": 6400,
+        "m03": 6400,
+        "m04": 6400
+      }
+    },
+    {
+      "replacement_id": "rain-craft",
+      "display_name": "手作工坊",
+      "replaces": "c02-n02",
+      "node": {
+        "node_id": "c02-n02-r4",
+        "start": "2026-11-21T14:00:00+08:00",
+        "end": "2026-11-21T15:00:00+08:00",
+        "kind": "activity",
+        "place_tag": "workshop",
+        "indoor": true
+      },
+      "cost_per_member": {
+        "m01": 6400,
+        "m02": 6400,
+        "m03": 6400,
+        "m04": 6400
+      }
+    }
+  ]
+}
