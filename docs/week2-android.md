@@ -34,7 +34,7 @@ adb install -r 'tongxing-plan-0.2.0+2-debug.apk'
 
 ## 可重建与数据版本
 
-已固定 Flutter 3.32.8、Dart 3.8.1、Android SDK/platform/build-tools 35、JDK 17、Gradle 8.12、AGP 8.7.3。依赖锁文件、Gradle wrapper 与源码一同提交。SDK 不在 PATH 时可传绝对路径；Windows 中文路径用 `tools/build-apk.ps1` 暂存到 ASCII 目录。
+已固定 Flutter 3.32.8、Dart 3.8.1、Android SDK/platform/build-tools 35、NDK 27.0.12077973、JDK 17、Gradle 8.12、AGP 8.7.3。shared_preferences_android 要求 NDK 27；工程显式指定该版本。当前 Windows 环境的 Gradle 文件监听返回 error 87，已关闭可选的 VFS 监听。依赖锁文件、Gradle wrapper 与源码一同提交。SDK 不在 PATH 时可传绝对路径；Windows 中文路径用 `tools/build-apk.ps1` 暂存到 ASCII 目录。
 
 ```powershell
 cd mobile
