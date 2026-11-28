@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationInfo, field_validator
 
 from algorithm.conflict_detector import parse_time
+from core.transport_codes import CANONICAL, normalize_transports
 
 
 NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -97,9 +98,10 @@ class PreferencesRequest(RequestModel):
     @field_validator("allowed_transport")
     @classmethod
     def require_concrete_transport(cls, values: list[str]) -> list[str]:
-        if any(value.casefold() == "none" for value in values):
-            raise ValueError("请填写实际可接受的交通方式。")
-        return values
+        normalized = normalize_transports(values)
+        if any(value not in CANONICAL for value in normalized):
+            raise ValueError("请选择地铁、公交、打车、步行或自行车，交通码区分大小写。")
+        return normalized
 
 
 class Member(BaseModel):

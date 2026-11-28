@@ -1,0 +1,8 @@
+{
+  "version": "1.0",
+  "canonical": ["metro", "bus", "taxi", "walk", "bicycle"],
+  "aliases": {"bike": "bicycle"},
+  "case_sensitive": true,
+  "empty_policy": "require_explicit_selection",
+  "labels_zh": {"metro": "地铁", "bus": "公交", "taxi": "打车", "walk": "步行", "bicycle": "自行车"}
+}

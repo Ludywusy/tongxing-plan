@@ -1,0 +1,16 @@
+test_all_times_carry_offset (test_conflict_detector.DetectorCaseTests.test_all_times_carry_offset)
+fixture 内所有时间都必须是带偏移的 ISO 8601。 ... ok
+test_case_ids_unique (test_conflict_detector.DetectorCaseTests.test_case_ids_unique) ... ok
+test_entry_points_agree (test_conflict_detector.DetectorCaseTests.test_entry_points_agree)
+detect / detect_trip / detect_resolved 三条入口对同一条行程结论一致。 ... ok
+test_fixed_cases (test_conflict_detector.DetectorCaseTests.test_fixed_cases) ... ok
+test_fixture_version_matches (test_conflict_detector.DetectorCaseTests.test_fixture_version_matches) ... ok
+test_golden_outputs (test_conflict_detector.DetectorCaseTests.test_golden_outputs)
+三种状态各一条完整输出；与 docs/contract.md 第一节逐字段一致。 ... ok
+test_replacement_missing_time_is_incomplete (test_conflict_detector.DetectorCaseTests.test_replacement_missing_time_is_incomplete)
+降雨替代节点时间缺字段/格式非法时不得抛异常，须返回结构化 incomplete。 ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.011s
+
+OK

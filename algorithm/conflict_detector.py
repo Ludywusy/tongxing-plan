@@ -55,6 +55,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Any, TypedDict
+from core.transport_codes import normalize_transport, normalize_transports
 
 # ---------------------------------------------------------------- 公共常量与类型
 
@@ -247,7 +248,9 @@ def check_completeness(fixture: Fixture, trip: Trip) -> list[MissingField]:
             missing.append({"member_id": mid, "field": "budget_cap", "rule_id": R_DATA_01})
 
         transport = m.get("allowed_transport")
-        if not isinstance(transport, list) or not transport:
+        if not isinstance(transport, list) or not transport or any(
+            not isinstance(mode, str) or not mode.strip() for mode in transport
+        ):
             missing.append({"member_id": mid, "field": "allowed_transport", "rule_id": R_DATA_01})
 
         # [] 表示本人明确写了「没有禁忌」；不填或格式不对都得先补，不能默认成空集。
@@ -500,7 +503,9 @@ def detect_resolved(fixture: Fixture, trip: Trip) -> DetectionResult:
     # R-TRANS：逐段检查；同一人只报第一条，指向第一段违反的节点
     for m in sorted(fixture["members"], key=lambda x: x["member_id"]):
         for node in nodes:
-            if node["kind"] == "transit" and node.get("transport") not in m["allowed_transport"]:
+            if (node["kind"] == "transit" and
+                    normalize_transport(node.get("transport")) not in
+                    normalize_transports(m["allowed_transport"])):
                 reasons.append({
                     "rule_id": R_TRANS_01,
                     "member_ids": [m["member_id"]],

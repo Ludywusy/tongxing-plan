@@ -1,0 +1,25 @@
+name: tongxing_plan
+description: Offline and shared-room trip planning client for Android.
+publish_to: none
+version: 0.2.0+2
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  shared_preferences: ^2.5.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/demo-trip.json
+    - assets/demo-trip-1.1.json
+    - assets/lanzhou-weekend.png

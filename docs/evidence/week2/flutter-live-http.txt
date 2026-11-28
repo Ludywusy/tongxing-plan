@@ -1,0 +1,3 @@
+00:00 +0: loading C:/Users/Administrator/AppData/Local/Temp/tongxing-plan-upstream/mobile/test/live_room_api_test.dart
+00:00 +0: four independent API clients agree before and after a real service restart
+00:02 +1: All tests passed!

@@ -4,6 +4,8 @@
 *.json text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+*.dart text eol=lf
+mobile/android/gradlew text eol=lf
 *.csv text eol=lf
 *.png binary
 *.jpg binary
